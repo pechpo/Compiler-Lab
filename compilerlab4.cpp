@@ -126,6 +126,7 @@ string call_func(frame *cur_frame, int &p){
 
 //synchronize the memory stack and the abstract stack
 //in the end, remain a temporary value in memory stack, 
+//  p points to the token after "(" previously, and
 //  p points to the token after ")"(control statement or function call), "," or ";"(assignment or return)
 string parse_exp(frame *cur_frame, int &p){  
     string result;
@@ -211,7 +212,7 @@ string parse_exp(frame *cur_frame, int &p){
         }
         //end of expression
         if (token_stream[p-1].type==4) break;
-        if (parenthesis<0) break;  //the end of a function call
+        if (parenthesis<0) break;  //the end of a control statement or function call
     }
     return result;
 }
@@ -246,6 +247,7 @@ string assignment(frame *cur_frame, int &p){
 
 //deal with a code block, where p points to "{" previously, and the character after "}" afterwards
 string parse_block(frame *father_frame, int &p){
+    p++;
     frame *cur_frame = new frame();
     *cur_frame = *father_frame;  //temporal frame for inner code block
     string result="";
@@ -269,7 +271,7 @@ string parse_block(frame *father_frame, int &p){
                 result+="leave\nret\n";
             }
             if (token_stream[p].content=="if"){
-                p++;
+                p+=2;
                 string id=to_string(if_cnt++);
                 result+=".if_"+id+"_begin:\n";  // label of the begin of "if" block
                 result+=parse_exp(cur_frame, p);
@@ -285,7 +287,7 @@ string parse_block(frame *father_frame, int &p){
                 result+=".else_"+id+"_end:\n";  // label of the end of "else" block
             }
             if (token_stream[p].content=="while"){
-                p++;
+                p+=2;
                 string id=to_string(while_cnt++);
                 result+=".while_"+id+"_begin:\n";  // label of the begin of "while" block
                 result+=parse_exp(cur_frame, p);
@@ -299,11 +301,13 @@ string parse_block(frame *father_frame, int &p){
             }
             if (token_stream[p].content=="continue"){
                 string id=while_label.top();
-                result+="jmp .while_"+id+"_begin:\n";
+                result+="jmp .while_"+id+"_begin\n";
+                p+=2;
             }
             if (token_stream[p].content=="break"){
                 string id=while_label.top();
-                result+="jmp .while_"+id+"_end:\n";
+                result+="jmp .while_"+id+"_end\n";
+                p+=2;
             }
         }
         if (token_stream[p].type==1){  //indicate assigning a variable or calling a function
@@ -339,7 +343,7 @@ string parse_function(int &p){
         up_shift+=4;
         p+=3;
     }
-    p+=2;  //points to the character after "{"
+    p++;  //points to the character "{"
     //deal with the body of this function
     result+=parse_block(cur_frame, p);
     if (cur_frame->ret_type=="void") result+="leave\nret\n";  //may be redundant for complex functions
